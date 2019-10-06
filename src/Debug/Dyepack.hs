@@ -25,24 +25,24 @@ newtype Dyed a = Dyed [Part]
 -- program.
 dye :: forall a . (GHC.Generic a
                   , GFrom a
-                  , All (All Top) (GCode a)
+                  , SListI (GCode a)
                   , GDatatypeInfo a ) => a -> IO (Dyed a)
 dye !x = do
   let parts :: [IO Part]
-      parts = hcollapse $ hczipWith (Proxy @Top) go cinfo (unSOP $ gfrom x)
+      parts = hcollapse $ hzipWith go cinfo (unSOP $ gfrom x)
 
       cinfo = constructorInfo info
       info = gdatatypeInfo (Proxy @a)
   Dyed <$> sequence parts
   where go :: ConstructorInfo xs -> NP I xs -> K [IO Part] xs
-        go (Constructor n) x = K (hcollapse $ hcmap (Proxy @Top) (doOne n) x)
-        go (Infix n _ prec) x = K (hcollapse $ hcmap (Proxy @Top) (doOne n) x)
+        go (Constructor n) x = K (hcollapse $ hmap (doOne n) x)
+        go (Infix n _ prec) x = K (hcollapse $ hmap (doOne n) x)
         go (Record n fi) x = K (goProd fi x)
 
         doOne d !(I !y) = K (Part d <$> mkWeakPtr y Nothing)
 
         goProd :: All Top xs => NP FieldInfo xs -> NP I xs -> [IO Part]
-        goProd fi x = hcollapse $ hczipWith (Proxy @Top) (\(FieldInfo l) y -> doOne l y) fi x
+        goProd fi x = hcollapse $ hzipWith (\(FieldInfo l) y -> doOne l y) fi x
 
 
 -- | Check if any part of 'Dyed' is being retained. The callback is triggered when
